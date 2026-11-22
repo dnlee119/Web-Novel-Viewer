@@ -1,17 +1,24 @@
 # Web Novel Viewer
 
-웹소설 뷰어 프로젝트입니다.
+> **Codex AI 생성물 안내**
+>
+> 이 저장소의 작업물은 Codex AI를 이용해 생성했습니다.
 
-## GitHub에서 작업 관리
+Web Novel Viewer는 웹소설의 문장과 문단에 스크롤 연출을 더하는 **웹 뷰어와 에디터** 프로젝트입니다. 창작자는 원하는 구절에 이미지·대사·배경음과 효과를 배치하고, 독자는 자신의 속도로 읽거나 자동 재생을 선택할 수 있도록 기획하고 있습니다.
 
-- 작업 내용과 완료 기준은 GitHub Issues에 기록합니다.
-- 이슈별 브랜치에서 작업하고 `main`으로 Pull Request를 엽니다. PR 본문에 `Closes #이슈번호`를 넣으면 병합할 때 이슈가 함께 닫힙니다.
-- 배포 결과와 배포 주소는 저장소의 Actions 탭에서 `Deploy to GitHub Pages` 실행을 열어 확인할 수 있습니다.
+## 현재 상태
 
-## GitHub Pages 배포
+GitHub 저장소와 GitHub Pages 배포 워크플로를 설정했습니다. 뷰어와 에디터는 구현 전이며, 공개 데모도 아직 게시되지 않았습니다.
 
-현재 워크플로는 `site/`의 정적 파일을 게시합니다. `site/index.html`을 진입점으로 추가하고 CSS, JavaScript, 이미지 경로에는 저장소 이름이 포함된 Pages 주소에서도 동작하도록 상대 경로를 사용합니다.
+## 구현 계획
 
-1. GitHub 저장소에서 **Settings → Pages → Build and deployment → Source**를 **GitHub Actions**로 설정합니다. GitHub Free에서는 공개 저장소에서 Pages를 사용할 수 있습니다. 비공개 저장소의 Pages 지원 여부는 계정 요금제에 따라 달라집니다.
-2. `site/` 변경이 `main`에 반영되면 자동 배포됩니다. 최초에 Pages 설정을 마친 뒤에는 Actions 탭에서 `Deploy to GitHub Pages`를 선택해 `main`에서 수동 실행할 수도 있습니다.
-3. 프로젝트 사이트의 기본 주소는 `https://<사용자명>.github.io/<저장소명>/`입니다.
+1. **뷰어** — 문장과 문단을 스크롤 그룹으로 구성합니다. 역스크롤하거나 장면을 건너뛰어도 도착 지점의 화면을 복원하고, 효과를 끄거나 원문을 볼 수 있게 합니다.
+2. **재생과 미디어** — 자동 재생과 이미지·대사·배경음을 연결합니다. YouTube 플레이어는 독자가 재생을 선택하면 불러옵니다.
+3. **에디터와 외부 연동** — 일반 웹 문서처럼 글을 쓰고 선택한 구절에 연출을 추가할 수 있게 합니다. 뷰어와 에디터는 각자 원하는 웹사이트에 삽입할 수 있는 경량 JavaScript ES 모듈로 제공할 계획입니다. 작품은 사이트의 서버에서 JSON으로 관리하며, GET으로 불러오고 에디터에서 POST로 저장합니다.
+
+화면은 실제 삽입 영역과 입력 방식에 맞춰 구성합니다. 웹 브라우저와 WebView 등에서 동작하도록 설계하며, 지원 범위는 구현 후 확인합니다. 사용자 제작 효과는 보안과 결과물 품질을 검토한 뒤 별도 확장으로 다룰 예정입니다.
+
+## 작업 관리와 배포
+
+- 작업 제안과 진행 상황은 [GitHub Issues](https://github.com/dnlee119/Web-Novel-Viewer/issues)에서 관리합니다. 변경은 작업별 브랜치에서 진행하고 `main`으로 Pull Request를 엽니다.
+- `site/index.html`이 준비되면 `main`의 `site/` 변경을 GitHub Pages에 자동 배포합니다. 실행 결과는 [GitHub Actions](https://github.com/dnlee119/Web-Novel-Viewer/actions)에서 확인할 수 있습니다.
