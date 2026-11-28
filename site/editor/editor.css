@@ -62,10 +62,34 @@
 .wne .wne-preview-host { max-width: 100%; margin-top: .5rem; border: 1px solid var(--wne-line, #d9dedf); }
 .wne { container-type: inline-size; }
 @container (min-width: 48rem) {
-  .wne .wne-workspace { grid-template-columns: minmax(9rem, .85fr) minmax(0, 2.45fr) minmax(11rem, 1fr); }
+  .wne .wne-workspace { grid-template-columns: minmax(9rem, .85fr) minmax(0, 3.45fr); }
+  .wne .wne-workspace[data-inspector-open] {
+    grid-template-columns: minmax(9rem, .85fr) minmax(0, 2.45fr) minmax(11rem, 1fr);
+  }
   .wne .wne-scenes { border-inline-end: 1px solid var(--wne-line, #d9dedf); }
   .wne .wne-inspector { border-inline-start: 1px solid var(--wne-line, #d9dedf); }
 }
 
 .wne .wne-copy { padding: .85rem; }
 .wne .wne-copy textarea { width: 100%; min-height: 8rem; font: inherit; }
+
+.wne { position: relative; }
+.wne .wne-scene-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.wne .wne-scene-row button { min-height: 2.5rem; overflow-wrap: anywhere; }
+.wne .wne-scene-row button[aria-haspopup] { min-width: 2.5rem; text-align: center; }
+.wne .wne-scene-menu {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  min-width: min(10rem, calc(100vw - 8px));
+  max-height: calc(100vh - 8px);
+  overflow: auto;
+  gap: .18rem;
+  padding: .35rem;
+  border: 1px solid var(--wne-line, #d9dedf);
+  border-radius: .45rem;
+  background: var(--wne-background, #fff);
+  box-shadow: 0 .45rem 1.25rem #23333e1a;
+}
+
+.wne .wne-group-actions { display: flex; flex-wrap: wrap; align-items: end; gap: .5rem; margin-block: .4rem; }

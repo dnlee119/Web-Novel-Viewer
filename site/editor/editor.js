@@ -2,10 +2,12 @@ import { assetUrl, isList, validateWork } from '../viewer/model.js';
 import { parseWork } from '../viewer/source.js';
 import { appendText, textTag } from '../viewer/text.js';
 import { changeKind, marked, readInline, readText, splitSelection, stripMark } from './edit-text.js';
+import { createSceneMenu } from './scene-menu.js';
 import { loadEditorWork, portableWork, saveEditorWork } from './transport.js';
 
 const stylesheet = new URL('./editor.css', import.meta.url).href;
 const mounted = new WeakMap();
+let editorCount = 0;
 const blankWork = { schemaVersion: 1, lang: 'ko', title: '제목 없는 작품',
   groups: [{ id: 'scene-1', title: '장면 1', objects: [] }] };
 const viewEffects = [['none', '없음'], ['fade', '페이드'], ['slide', '슬라이드']];
@@ -94,6 +96,7 @@ export function mountEditor(container, options = {}) {
   documentColumn.className = 'wne-document';
   const inspector = node('aside', undefined, workspace);
   inspector.className = 'wne-inspector';
+  inspector.id = 'wne-inspector-' + ++editorCount;
   const previewPanel = node('section', undefined, root);
   previewPanel.className = 'wne-preview';
   const previewBar = node('div', undefined, previewPanel);
@@ -105,11 +108,19 @@ export function mountEditor(container, options = {}) {
   const previewHost = node('div', undefined, previewPanel);
   previewHost.className = 'wne-preview-host';
   previewHost.hidden = true;
+  const sceneMenu = createSceneMenu(root, controller.signal);
 
   let baseUrl = new URL(options.assetBaseUrl ?? document.baseURI, document.baseURI).href;
   let work = validateWork(blankWork, { baseUrl });
   let groupId = work.groups[0].id;
   let selected = null;
+  let inspectorOpen = false;
+  let sceneClipboard;
+  let objectClipboard;
+  let pasteSceneControl;
+  let copyObjectControl;
+  let pasteObjectControl;
+  let groupActions;
   let range;
   let composing = false;
   let revision = 0;
@@ -140,12 +151,13 @@ export function mountEditor(container, options = {}) {
   }
 
   function snapshot() {
-    return { work, baseUrl, groupId, selected };
+    return { work, baseUrl, groupId, selected, inspectorOpen };
   }
 
   function select(group, item) {
     groupId = group;
     selected = item;
+    inspectorOpen = false;
     range = undefined;
     selectionSet.clear();
   }
@@ -181,7 +193,7 @@ export function mountEditor(container, options = {}) {
   function travel(from, to) {
     if (composing || !from.length) return;
     to.push(snapshot());
-    ({ work, baseUrl, groupId, selected } = from.pop());
+    ({ work, baseUrl, groupId, selected, inspectorOpen } = from.pop());
     range = undefined;
     selectionSet.clear();
     revision++;
@@ -430,28 +442,153 @@ export function mountEditor(container, options = {}) {
     }, { redraw: false });
   }
 
+  function activeObjects() {
+    return group().objects.filter((item) => selectionSet.size ? selectionSet.has(item.id) : item.id === selected);
+  }
+
+  function copyScene(sceneId) {
+    if (composing) return;
+    const scene = work.groups.find((entry) => entry.id === sceneId);
+    if (!scene) return;
+    sceneClipboard = { value: structuredClone(scene), baseUrl };
+    pasteSceneControl.disabled = false;
+    message(scene.title + ' 장면을 복사했습니다.');
+  }
+
+  function copyObjects() {
+    if (composing) return;
+    const objects = activeObjects();
+    if (!objects.length) return;
+    objectClipboard = { value: structuredClone(objects), baseUrl };
+    pasteObjectControl.disabled = false;
+    message(objects.length + '개 객체를 복사했습니다.');
+  }
+
+  function duplicateObjects(objects, sourceBase) {
+    const copies = sourceBase === baseUrl ? structuredClone(objects) :
+      portableWork({ groups: [{ objects }] }, sourceBase).groups[0].objects;
+    const blocks = new Map();
+    for (const item of copies) {
+      item.id = id('object');
+      if (item.blockId) {
+        if (!blocks.has(item.blockId)) blocks.set(item.blockId, id('block'));
+        item.blockId = blocks.get(item.blockId);
+      }
+    }
+    return copies;
+  }
+
+  function pasteScene(after = group().id) {
+    if (composing || !sceneClipboard) return;
+    const source = sceneClipboard.value;
+    const scene = { ...source, id: id('scene'), title: source.title + ' (복사본)',
+      objects: duplicateObjects(source.objects, sceneClipboard.baseUrl) };
+    if (change((entry, next) => {
+      const index = next.groups.findIndex(({ id }) => id === after);
+      next.groups.splice(index + 1, 0, scene);
+    }, { redraw: false })) {
+      select(scene.id, null);
+      render();
+      focusScene(scene.id);
+      message('장면 복사본을 붙여넣었습니다.');
+    }
+  }
+
+  function pasteObjects() {
+    if (composing || !objectClipboard) return;
+    const copies = duplicateObjects(objectClipboard.value, objectClipboard.baseUrl);
+    const anchor = activeObjects().at(-1);
+    if (change((entry) => {
+      const index = anchor ? entry.objects.findIndex((item) => item.id === anchor.id) : -1;
+      entry.objects.splice(index === -1 ? entry.objects.length : index + 1, 0, ...copies);
+    }, { redraw: false })) {
+      select(groupId, copies[0].id);
+      render();
+      pickButton(copies[0].id)?.focus();
+      message(copies.length + '개 객체를 붙여넣었습니다.');
+    }
+  }
+
+  function focusScene(sceneId) {
+    [...scenes.querySelectorAll('[data-scene]')].find((button) => button.dataset.scene === sceneId)?.focus();
+  }
+
+  function moveScene(sceneId, delta) {
+    const from = work.groups.findIndex((entry) => entry.id === sceneId);
+    if (from < 0 || !work.groups[from + delta]) return;
+    if (change((entry, next) => {
+      [next.groups[from], next.groups[from + delta]] = [next.groups[from + delta], next.groups[from]];
+    })) focusScene(sceneId);
+  }
+
+  function deleteScene(sceneId) {
+    const index = work.groups.findIndex((entry) => entry.id === sceneId);
+    if (index < 0) return;
+    const emptyScene = work.groups.length === 1 ? { id: id('scene'), title: '장면 1', objects: [] } : null;
+    const title = work.groups[index].title;
+    if (!change((entry, next) => {
+      if (emptyScene) next.groups = [emptyScene];
+      else next.groups.splice(index, 1);
+    }, { redraw: false })) return;
+    if (sceneId === groupId) select(work.groups[Math.min(index, work.groups.length - 1)].id, null);
+    render();
+    focusScene(groupId);
+    message(title + ' 장면을 삭제했습니다. 실행 취소로 복구할 수 있습니다.');
+  }
+
   function renderScenes() {
+    sceneMenu.close();
     scenes.replaceChildren();
     node('h2', '장면', scenes);
-    for (const entry of work.groups) {
-      const choice = button(scenes, entry.title, () => {
+    for (const [index, entry] of work.groups.entries()) {
+      const row = node('div', undefined, scenes);
+      row.className = 'wne-scene-row';
+      const choice = button(row, entry.title, () => {
         select(entry.id, null);
         render();
+        focusScene(entry.id);
       });
+      choice.dataset.scene = entry.id;
       if (entry.id === groupId) choice.setAttribute('aria-current', 'true');
+      const label = entry.title + ' 장면 메뉴';
+      const trigger = button(row, '⋯', () => openMenu());
+      trigger.setAttribute('aria-label', label);
+      trigger.setAttribute('aria-haspopup', 'menu');
+      trigger.setAttribute('aria-expanded', 'false');
+
+      function openMenu(point) {
+        sceneMenu.toggle(trigger, label, [
+          { label: '장면 선택', run: () => choice.click() },
+          { label: '장면 위로', disabled: index === 0, run: () => moveScene(entry.id, -1) },
+          { label: '장면 아래로', disabled: index === work.groups.length - 1, run: () => moveScene(entry.id, 1) },
+          { label: '장면 복사', run: () => copyScene(entry.id) },
+          { label: '장면 붙여넣기', disabled: !sceneClipboard, run: () => pasteScene(entry.id) },
+          { label: '해당 장면 삭제', run: () => deleteScene(entry.id) },
+        ], point);
+      }
+      row.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        openMenu(event.clientX || event.clientY ? { x: event.clientX, y: event.clientY } : undefined);
+      });
+      row.addEventListener('keydown', (event) => {
+        if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+        event.preventDefault();
+        openMenu();
+      });
     }
     button(scenes, '장면 추가', () => {
       const scene = { id: id('scene'), title: '장면 ' + (work.groups.length + 1), objects: [] };
-      if (change((entry, next) => next.groups.push(scene))) {
+      if (change((entry, next) => next.groups.push(scene), { redraw: false })) {
         select(scene.id, null);
         render();
+        focusScene(scene.id);
       }
     });
+    button(scenes, '해당 장면 삭제', () => deleteScene(group().id));
+    pasteSceneControl = button(scenes, '장면 붙여넣기', () => pasteScene());
+    pasteSceneControl.disabled = !sceneClipboard;
     for (const [delta, label] of [[-1, '장면 위로'], [1, '장면 아래로']]) {
-      button(scenes, label, () => change((entry, next) => {
-        const from = next.groups.indexOf(entry);
-        [next.groups[from], next.groups[from + delta]] = [next.groups[from + delta], next.groups[from]];
-      })).disabled = !work.groups[work.groups.indexOf(group()) + delta];
+      button(scenes, label, () => moveScene(group().id, delta)).disabled = !work.groups[work.groups.indexOf(group()) + delta];
     }
     field(scenes, '장면 이름', group().title, (title) => change((entry) => { entry.title = title; }));
     field(scenes, '자동 재생 (ms)', group().autoMs ?? 6000,
@@ -475,24 +612,33 @@ export function mountEditor(container, options = {}) {
     button(toolbar, '링크 삽입', () => linkForm(toolbar), true);
     button(toolbar, '연출 객체 만들기', feature, true);
     button(toolbar, '연출 해제', dissolve);
+    copyObjectControl = button(toolbar, '객체 복사', copyObjects);
+    pasteObjectControl = button(toolbar, '객체 붙여넣기', pasteObjects);
+    groupActions = node('div', undefined, documentColumn);
+    groupActions.className = 'wne-group-actions';
 
     for (const [index, item] of group().objects.entries()) {
       const row = node('div', undefined, documentColumn);
       row.className = 'wne-object';
       const head = node('div', undefined, row);
       head.className = 'wne-object-head';
-      const selectButton = button(head, item.featured ? '연출 ' + (index + 1) : '객체 ' + (index + 1), () => selectObject(item.id));
+      const selectButton = button(head, item.featured ? '연출 ' + (index + 1) : '객체 ' + (index + 1), () => openInspector(item.id));
       selectButton.dataset.pick = item.id;
       selectButton.setAttribute('aria-pressed', String(selected === item.id));
+      selectButton.setAttribute('aria-controls', inspector.id);
+      row.addEventListener('click', (event) => {
+        if (!head.contains(event.target)) selectObject(item.id, true);
+      });
       const selectionLabel = node('label', undefined, head);
       const checkbox = node('input', undefined, selectionLabel);
       checkbox.type = 'checkbox';
       checkbox.checked = selectionSet.has(item.id);
-      node('span', '그룹 이동 선택', selectionLabel);
+      node('span', '객체 선택', selectionLabel);
+      checkbox.setAttribute('aria-label', selectButton.textContent + ' 선택');
       checkbox.addEventListener('change', () => {
         if (checkbox.checked) selectionSet.add(item.id);
         else selectionSet.delete(item.id);
-        renderInspector();
+        updateObjectCommands();
       });
       if (item.type === 'text') {
         const editable = node(textTag(item.kind), undefined, row);
@@ -538,36 +684,71 @@ export function mountEditor(container, options = {}) {
     if (!group().objects.length) node('p', '문단이나 이미지를 추가해 장면을 작성하세요.', documentColumn);
   }
 
-  function selectObject(id) {
+  function pickButton(id) {
+    return [...documentColumn.querySelectorAll('[data-pick]')].find((button) => button.dataset.pick === id);
+  }
+
+  function selectObject(id, open = false) {
+    if (selected === id && (!open || inspectorOpen)) return;
     if (selected !== id) range = undefined;
     selected = id;
-    for (const control of documentColumn.querySelectorAll('[data-pick]')) {
-      control.setAttribute('aria-pressed', String(control.dataset.pick === id));
-    }
+    inspectorOpen = open;
+    updateObjectCommands();
     renderInspector();
   }
 
-  function renderInspector() {
-    inspector.replaceChildren();
-    node('h2', '객체 속성', inspector);
-    const item = object();
-    const groupChoices = work.groups.filter(({ id }) => id !== groupId).map(({ id, title }) => [id, title]);
-    if (groupChoices.length) {
-      const destination = field(inspector, '이동할 장면', groupChoices[0][0], null, { choices: groupChoices });
-      button(inspector, '선택한 객체 이동', () => {
-        const ids = selectionSet.size ? new Set(selectionSet) : new Set([selected]);
-        const idsInOrder = group().objects.filter(({ id }) => ids.has(id)).map(({ id }) => id);
-        if (change((entry, next) => {
-          const target = next.groups.find(({ id }) => id === destination.value);
-          target.objects.push(...entry.objects.filter(({ id }) => ids.has(id)));
-          entry.objects = entry.objects.filter(({ id }) => !ids.has(id));
-        })) {
-          select(destination.value, idsInOrder[0] ?? null);
-          render();
-        }
-      }).disabled = !item && !selectionSet.size;
+  function openInspector(id) {
+    selectObject(id, true);
+    inspector.querySelector('h2')?.focus();
+  }
+
+  function closeInspector() {
+    inspectorOpen = false;
+    renderInspector();
+    pickButton(selected)?.focus();
+  }
+
+  function updateObjectCommands() {
+    const objects = activeObjects();
+    copyObjectControl.disabled = !objects.length;
+    pasteObjectControl.disabled = !objectClipboard;
+    const choices = work.groups.filter(({ id }) => id !== groupId).map(({ id, title }) => [id, title]);
+    groupActions.replaceChildren();
+    groupActions.hidden = !choices.length || !objects.length;
+    if (groupActions.hidden) return;
+    const destination = field(groupActions, '이동할 장면', choices[0][0], null, { choices });
+    button(groupActions, '선택한 객체 이동', () => {
+      const ids = new Set(objects.map(({ id }) => id));
+      if (change((entry, next) => {
+        const target = next.groups.find(({ id }) => id === destination.value);
+        target.objects.push(...entry.objects.filter(({ id }) => ids.has(id)));
+        entry.objects = entry.objects.filter(({ id }) => !ids.has(id));
+      }, { redraw: false })) {
+        select(destination.value, objects[0].id);
+        render();
+      }
+    });
+  }
+
+  function updateInspectorDisclosure(show) {
+    for (const control of documentColumn.querySelectorAll('[data-pick]')) {
+      const current = control.dataset.pick === selected;
+      control.setAttribute('aria-pressed', String(current));
+      control.setAttribute('aria-expanded', String(current && show));
     }
-    if (!item) return;
+  }
+
+  function renderInspector() {
+    const item = object();
+    const show = inspectorOpen && Boolean(item);
+    inspector.hidden = !show;
+    workspace.toggleAttribute('data-inspector-open', show);
+    updateInspectorDisclosure(show);
+    inspector.replaceChildren();
+    if (!show) return;
+    const heading = node('h2', '객체 속성', inspector);
+    heading.tabIndex = -1;
+    button(inspector, '속성 닫기', closeInspector);
     for (const [delta, label] of [[-1, '객체 위로'], [1, '객체 아래로']]) {
       button(inspector, label, () => change((entry) => {
         const from = entry.objects.findIndex(({ id }) => id === item.id);
@@ -576,13 +757,20 @@ export function mountEditor(container, options = {}) {
     }
 
     function update(key, value, choices, numeric = false, required = false) {
-      field(inspector, keyLabels[key], value, (edited) => {
+      let lastValue = value;
+      const control = field(inspector, keyLabels[key], value, (edited) => {
         const success = change((entry) => {
           const target = entry.objects.find(({ id }) => id === item.id);
           if (key === 'kind') Object.assign(target, changeKind(target, edited));
           else target[key] = edited === '' && !required ? undefined : numeric ? Number(edited) : edited;
-        });
-        if (!success) renderInspector();
+        }, { redraw: false });
+        if (success) {
+          lastValue = object()[key] ?? edited;
+          renderDocument();
+          updateObjectCommands();
+          updateInspectorDisclosure(true);
+        }
+        control.value = lastValue ?? '';
       }, { choices, inputMode: numeric ? 'decimal' : undefined });
     }
 
@@ -629,14 +817,35 @@ export function mountEditor(container, options = {}) {
     range = undefined;
     renderScenes();
     renderDocument();
+    updateObjectCommands();
     renderInspector();
     updateCommands();
     queuePreview();
   }
 
   function keydown(event) {
+    if (event.key === 'Escape' && inspectorOpen && inspector.contains(event.target)) {
+      event.preventDefault();
+      closeInspector();
+      return;
+    }
     if (event.isComposing || composing || !(event.metaKey || event.ctrlKey)) return;
     const key = event.key.toLowerCase();
+    if (!event.altKey && !event.shiftKey && ['c', 'v'].includes(key) &&
+        !event.target.closest('input, select, textarea, [contenteditable]')) {
+      const sceneId = event.target.closest('.wne-scene-row')?.querySelector('[data-scene]').dataset.scene;
+      const inScene = scenes.contains(event.target);
+      const inObjects = documentColumn.contains(event.target) || inspector.contains(event.target);
+      if (inScene || inObjects) {
+        event.preventDefault();
+        if (inScene) {
+          if (key === 'c') copyScene(sceneId ?? groupId);
+          else pasteScene(sceneId);
+        } else if (key === 'c') copyObjects();
+        else pasteObjects();
+      }
+      return;
+    }
     if (event.altKey || !['z', 'y', 'b', 'i', 'u'].includes(key)) return;
     if (event.target.matches('input, select, textarea')) return;
     event.preventDefault();
