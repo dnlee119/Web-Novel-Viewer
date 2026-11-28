@@ -1,5 +1,7 @@
+@import url('../ui/materials.css');
+@import url('../ui/icons.css');
 .wnv {
-  color: var(--wnv-color, #202e39);
+  color: var(--wnv-color, var(--wn-ink));
   background: var(--wnv-background, #fff);
   font: inherit;
   line-height: 1.6;
@@ -25,11 +27,13 @@
   min-width: 0;
 }
 .wnv-playback {
+  background: var(--wnv-subtle, var(--wn-sky));
+  border-block-start: 1px solid var(--wnv-line, var(--wn-edge));
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: .4rem;
-  padding: 0 .85rem .7rem;
+  padding: .55rem .85rem;
 }
 
 .wnv button {
@@ -47,26 +51,26 @@
   overflow-wrap: anywhere;
 }
 
-.wnv button:hover { background: var(--wnv-subtle, #f2f3f2); }
+.wnv button:hover { background: var(--wnv-subtle, var(--wn-sky)); }
 .wnv .wnv-chapter[aria-current="step"] {
   color: var(--wnv-active-text, #fff);
-  background: var(--wnv-active, #223746);
+  background: var(--wnv-active, var(--wn-blue));
 }
-.wnv .wnv-control { border-color: var(--wnv-line, #d6dbdf); }
+.wnv .wnv-control { border-color: var(--wnv-line, var(--wn-edge)); }
 .wnv .wnv-play {
   color: var(--wnv-active-text, #fff);
-  background: var(--wnv-active, #223746);
-  border-color: var(--wnv-active, #223746);
+  background: var(--wnv-active, var(--wn-blue));
+  border-color: var(--wnv-active, var(--wn-blue));
 }
 .wnv .wnv-play:hover { filter: brightness(1.16); }
-.wnv button:disabled { cursor: default; color: var(--wnv-muted, #58656f); }
+.wnv button:disabled { cursor: default; color: var(--wnv-muted, var(--wn-muted)); }
 .wnv .wnv-control[aria-pressed="true"] {
-  background: var(--wnv-subtle, #f2f3f2);
-  border-color: var(--wnv-active, #223746);
+  background: var(--wnv-subtle, var(--wn-sky));
+  border-color: var(--wnv-active, var(--wn-blue));
 }
 
 .wnv :focus-visible {
-  outline: 2px solid var(--wnv-accent, #9b492b);
+  outline: 2px solid var(--wnv-accent, var(--wn-focus));
   outline-offset: 2px;
 }
 .wnv .wnv-viewport:focus-visible { outline-offset: -3px; }
@@ -79,7 +83,7 @@
 .wnv-speed select {
   background: var(--wnv-background, #fff);
   color: inherit;
-  border: 1px solid var(--wnv-line, #d6dbdf);
+  border: 1px solid var(--wnv-line, var(--wn-edge));
   border-radius: .375rem;
   font: inherit;
   min-height: 2.5rem;
@@ -100,16 +104,16 @@
 .wnv-volume input {
   width: 7rem;
   max-width: 32vw;
-  accent-color: var(--wnv-accent, #9b492b);
+  accent-color: var(--wnv-accent, var(--wn-focus));
 }
 
 .wnv-meter {
   height: 3px;
-  background: var(--wnv-line, #d6dbdf);
+  background: var(--wnv-line, var(--wn-edge));
 }
 .wnv-meter-fill {
   height: 100%;
-  background: var(--wnv-accent, #9b492b);
+  background: var(--wnv-accent, var(--wn-focus));
   transform: scaleX(0);
   transform-origin: left;
 }
@@ -120,13 +124,13 @@
   min-height: 12rem;
   overflow: auto;
   scroll-behavior: auto;
-  background: var(--wnv-stage-background, #f6f4ee);
+  background: var(--wnv-stage-background, #fcfdff);
 }
 .wnv-track { overflow-anchor: none; }
 .wnv-stage {
   position: sticky;
   top: 0;
-  background: var(--wnv-stage-background, #f6f4ee);
+  background: var(--wnv-stage-background, #fcfdff);
 }
 .wnv-scene {
   position: relative;
@@ -154,8 +158,8 @@
   word-break: keep-all;
 }
 .wnv-image {
-  color: var(--wnv-color, #202e39);
-  background: var(--wnv-subtle, #f2f3f2);
+  color: var(--wnv-color, var(--wn-ink));
+  background: var(--wnv-subtle, var(--wn-sky));
 }
 .wnv-image img {
   display: block;
@@ -166,7 +170,7 @@
 }
 .wnv-image-fallback { display: block; padding: 1rem; }
 .wnv-media {
-  color: var(--wnv-color, #202e39);
+  color: var(--wnv-color, var(--wn-ink));
   font-size: .875rem;
   overflow-wrap: anywhere;
 }
@@ -202,6 +206,22 @@
   padding: clamp(1rem, 5%, 3rem);
   overflow-wrap: anywhere;
 }
-.wnv-original-group h2 { font-size: 1.125rem; }
+.wnv-original-group { line-height: 1.85; }
+.wnv-original-group h2 {
+  margin-block: 0 1rem;
+  font: 650 clamp(1.25rem, 1.1em + .35rem, 1.65rem)/1.35 var(--wnv-heading-font, Georgia, serif);
+}
+.wnv-original-group + .wnv-original-group {
+  padding-block-start: 1.65rem;
+  border-block-start: 1px solid var(--wnv-line, var(--wn-edge));
+}
 .wnv-original-group + .wnv-original-group { margin-top: 2.25rem; }
-.wnv-original-image { font-size: .9375rem; color: var(--wnv-muted, #58656f); }
+.wnv-original-image { font-size: .9375rem; color: var(--wnv-muted, var(--wn-muted)); }
+
+.wnv .wnv-toolbar, .wnv .wnv-playback {
+  background-color: var(--wnv-subtle, var(--wn-sky));
+  background-image: var(--wn-metal-texture, var(--wn-metal-grain));
+}
+.wnv .wnv-stage, .wnv .wnv-original {
+  background-image: var(--wn-paper-texture, var(--wn-paper-grain));
+}

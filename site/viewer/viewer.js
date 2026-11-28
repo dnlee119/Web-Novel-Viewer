@@ -1,3 +1,4 @@
+import { iconButton } from '../ui/icon.js';
 import { assetUrl } from './model.js';
 import { appendTranscript, createMedia, isMedia } from './media.js';
 import { readWork } from './source.js';
@@ -99,9 +100,21 @@ function fillOriginal(article, work, strings, baseUrl) {
   }
 }
 
-function createView(document, work, baseUrl) {
+const icons = {
+  play: 'M7 3l14 9-14 9z', pause: 'M6 4h4v16H6zM14 4h4v16h-4z',
+  previous: 'M5 5v14m14-14-11 7 11 7z', next: 'M19 5v14M5 5l11 7-11 7z',
+  original: 'M12 6Q7 3 2 5v14q5-2 10 1 5-3 10-1V5q-5-2-10 1zm0 0v14',
+  effects: 'm4 20 11-11 3 3L7 23zM5 3v6M2 6h6m11-5v6m-3-3h6',
+  mute: 'M3 9h4l5-5v16l-5-5H3zm13 1 5 5m0-5-5 5',
+};
+
+function messages(locale, overrides) {
+  return { ...(locale.toLowerCase().split('-')[0] === 'ko' ? labels.ko : labels.en), ...overrides };
+}
+
+function createView(document, work, baseUrl, options) {
   const window = document.defaultView;
-  const strings = work.lang.toLowerCase().startsWith('ko') ? labels.ko : labels.en;
+  const strings = messages(options.locale || work.lang, options.messages?.viewer);
   const timed = timeRanges(work.groups);
   const duration = timed.at(-1).end;
   const mixes = new Map();
@@ -136,6 +149,8 @@ function createView(document, work, baseUrl) {
     button.setAttribute('aria-pressed', 'false');
     controls.append(button);
   }
+  iconButton(originalButton, icons.original, strings.original);
+  iconButton(effectsButton, icons.effects, strings.effects);
   toolbar.append(navigation, controls);
 
   const playback = element(document, 'div', 'wnv-playback');
@@ -143,6 +158,11 @@ function createView(document, work, baseUrl) {
   const playButton = element(document, 'button', 'wnv-control wnv-play', strings.play);
   const nextButton = element(document, 'button', 'wnv-control', strings.next);
   for (const button of [previousButton, playButton, nextButton]) button.type = 'button';
+  iconButton(previousButton, icons.previous, strings.previous);
+  iconButton(playButton, icons.play, strings.play);
+  iconButton(nextButton, icons.next, strings.next);
+  toolbar.lang = playback.lang = options.locale || work.lang;
+  navigation.lang = work.lang;
   const speedLabel = element(document, 'label', 'wnv-speed', strings.speed);
   const speedSelect = element(document, 'select');
   for (const rate of [0.5, 0.75, 1, 1.25, 1.5, 2]) {
@@ -175,6 +195,7 @@ function createView(document, work, baseUrl) {
       volume.append(range);
       const mute = element(document, 'button', 'wnv-control', `${strings[role]} ${strings.mute}`);
       mute.type = 'button';
+      iconButton(mute, icons.mute, mute.textContent);
       mute.setAttribute('aria-pressed', 'false');
       mute.addEventListener('click', () => {
         mix.muted = !mix.muted;
@@ -370,7 +391,7 @@ function createView(document, work, baseUrl) {
     anchorTime = window.performance.now();
     expectedScroll = viewport.scrollTop;
     playing = true;
-    playButton.textContent = strings.pause;
+    iconButton(playButton, icons.pause, strings.pause);
     playbackFrame = window.requestAnimationFrame(advance);
     return true;
   }
@@ -379,7 +400,7 @@ function createView(document, work, baseUrl) {
     if (!playing) return false;
     playing = false;
     window.cancelAnimationFrame(playbackFrame);
-    playButton.textContent = strings.play;
+    iconButton(playButton, icons.play, strings.play);
     return true;
   }
 
@@ -468,7 +489,7 @@ function createView(document, work, baseUrl) {
 export function mountViewer(container, source, options = {}) {
   if (container?.nodeType !== 1) throw new TypeError('mountViewer requires a DOM container');
   const document = container.ownerDocument;
-  const strings = document.documentElement.lang.toLowerCase().startsWith('ko') ? labels.ko : labels.en;
+  const strings = messages(options.locale || document.documentElement.lang, options.messages?.viewer);
   pendingMounts.get(container)?.destroy();
   const controller = new AbortController();
   const status = element(document, 'p', 'wnv-status', strings.loading);
@@ -496,7 +517,7 @@ export function mountViewer(container, source, options = {}) {
         document, signal: controller.signal, assetBaseUrl: options.assetBaseUrl,
       });
       if (controller.signal.aborted) throw new DOMException('Viewer was unmounted', 'AbortError');
-      view = createView(document, work, baseUrl);
+      view = createView(document, work, baseUrl, options);
       activeMounts.get(container)?.destroy();
       status.replaceWith(view.element);
       pendingMounts.delete(container);

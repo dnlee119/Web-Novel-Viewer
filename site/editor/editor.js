@@ -1,3 +1,4 @@
+import { editorActions } from './actions.js';
 import { assetUrl, isList, validateWork } from '../viewer/model.js';
 import { parseWork } from '../viewer/source.js';
 import { appendText, textTag } from '../viewer/text.js';
@@ -20,6 +21,10 @@ export function mountEditor(container, options = {}) {
   mounted.get(container)?.destroy();
   const document = container.ownerDocument;
   const window = document.defaultView;
+  const locale = options.locale || document.documentElement.lang || 'ko';
+  const commands = editorActions(locale, options.messages?.editor);
+  const ko = locale.toLowerCase().split('-')[0] === 'ko';
+  const ui = (key, korean, english) => options.messages?.editor?.[key] || (ko ? korean : english);
   const controller = new AbortController();
   const root = document.createElement('section');
   root.className = 'wne';
@@ -39,6 +44,7 @@ export function mountEditor(container, options = {}) {
 
   function button(parent, label, action, preserveSelection = false) {
     const control = node('button', label, parent);
+    commands.apply(control, label);
     control.type = 'button';
     if (preserveSelection) control.addEventListener('mousedown', (event) => {
       if (document.activeElement?.isContentEditable) event.preventDefault();
@@ -232,7 +238,7 @@ export function mountEditor(container, options = {}) {
     form.className = 'wne-insert';
     const url = field(form, '이미지 URL', '', null);
     const alt = field(form, '대체 텍스트', '', null);
-    const submit = node('button', '이미지 추가', form);
+    const submit = node('button', commands.label('이미지 추가'), form);
     submit.type = 'submit';
     button(form, '취소', () => form.remove());
     form.addEventListener('submit', (event) => {
@@ -254,7 +260,7 @@ export function mountEditor(container, options = {}) {
     const source = field(form, '자산 URL 또는 YouTube ID', '', null);
     const title = field(form, '미디어 제목', '', null);
     const transcript = field(form, '대본 또는 내용 설명', '', null);
-    node('button', '미디어 추가', form).type = 'submit';
+    node('button', commands.label('미디어 추가'), form).type = 'submit';
     button(form, '취소', () => form.remove());
     form.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -329,7 +335,7 @@ export function mountEditor(container, options = {}) {
     const form = node('form', undefined, toolbar);
     form.className = 'wne-insert';
     const href = field(form, '링크 주소', '', null);
-    node('button', '링크 적용', form).type = 'submit';
+    node('button', commands.label('링크 적용'), form).type = 'submit';
     button(form, '취소', () => form.remove());
     form.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -543,16 +549,18 @@ export function mountEditor(container, options = {}) {
     for (const [index, entry] of work.groups.entries()) {
       const row = node('div', undefined, scenes);
       row.className = 'wne-scene-row';
-      const choice = button(row, entry.title, () => {
+      const choice = button(row, '', () => {
         select(entry.id, null);
         render();
         focusScene(entry.id);
       });
+      choice.textContent = entry.title;
       choice.dataset.scene = entry.id;
       if (entry.id === groupId) choice.setAttribute('aria-current', 'true');
-      const label = entry.title + ' 장면 메뉴';
+      const label = entry.title + ' ' + ui('sceneMenu', '장면 메뉴', 'scene menu');
       const trigger = button(row, '⋯', () => openMenu());
       trigger.setAttribute('aria-label', label);
+      trigger.title = label;
       trigger.setAttribute('aria-haspopup', 'menu');
       trigger.setAttribute('aria-expanded', 'false');
 
@@ -564,7 +572,7 @@ export function mountEditor(container, options = {}) {
           { label: '장면 복사', run: () => copyScene(entry.id) },
           { label: '장면 붙여넣기', disabled: !sceneClipboard, run: () => pasteScene(entry.id) },
           { label: '해당 장면 삭제', run: () => deleteScene(entry.id) },
-        ], point);
+        ].map(command => ({ ...command, label: commands.label(command.label) })), point);
       }
       row.addEventListener('contextmenu', (event) => {
         event.preventDefault();
@@ -603,17 +611,27 @@ export function mountEditor(container, options = {}) {
       change((entry, next) => { next.title = value; }, { redraw: false }));
     const toolbar = node('div', undefined, documentColumn);
     toolbar.className = 'wne-bar';
-    button(toolbar, '문단 추가', addText);
-    button(toolbar, '이미지 삽입', addImage);
-    button(toolbar, '미디어 삽입', addMedia);
-    for (const [tag, label] of [['strong', '굵게'], ['em', '기울임'], ['u', '밑줄']]) {
-      button(toolbar, label, () => format(tag), true);
+    function toolsGroup(label) {
+      const group = node('div', undefined, toolbar);
+      group.className = 'wne-tools-group';
+      group.setAttribute('role', 'group');
+      group.setAttribute('aria-label', label);
+      return group;
     }
-    button(toolbar, '링크 삽입', () => linkForm(toolbar), true);
-    button(toolbar, '연출 객체 만들기', feature, true);
-    button(toolbar, '연출 해제', dissolve);
-    copyObjectControl = button(toolbar, '객체 복사', copyObjects);
-    pasteObjectControl = button(toolbar, '객체 붙여넣기', pasteObjects);
+    const insert = toolsGroup('본문 삽입');
+    const style = toolsGroup('텍스트 서식');
+    const effects = toolsGroup('연출 객체 편집');
+    button(insert, '문단 추가', addText);
+    button(insert, '이미지 삽입', addImage);
+    button(insert, '미디어 삽입', addMedia);
+    for (const [tag, label] of [['strong', '굵게'], ['em', '기울임'], ['u', '밑줄']]) {
+      button(style, label, () => format(tag), true);
+    }
+    button(style, '링크 삽입', () => linkForm(toolbar), true);
+    button(effects, '연출 객체 만들기', feature, true);
+    button(effects, '연출 해제', dissolve);
+    copyObjectControl = button(effects, '객체 복사', copyObjects);
+    pasteObjectControl = button(effects, '객체 붙여넣기', pasteObjects);
     groupActions = node('div', undefined, documentColumn);
     groupActions.className = 'wne-group-actions';
 
@@ -622,7 +640,7 @@ export function mountEditor(container, options = {}) {
       row.className = 'wne-object';
       const head = node('div', undefined, row);
       head.className = 'wne-object-head';
-      const selectButton = button(head, item.featured ? '연출 ' + (index + 1) : '객체 ' + (index + 1), () => openInspector(item.id));
+      const selectButton = button(head, (item.featured ? ui('featured','연출','Effect') : ui('object','객체','Object')) + ' ' + (index + 1), () => openInspector(item.id));
       selectButton.dataset.pick = item.id;
       selectButton.setAttribute('aria-pressed', String(selected === item.id));
       selectButton.setAttribute('aria-controls', inspector.id);
@@ -634,7 +652,7 @@ export function mountEditor(container, options = {}) {
       checkbox.type = 'checkbox';
       checkbox.checked = selectionSet.has(item.id);
       node('span', '객체 선택', selectionLabel);
-      checkbox.setAttribute('aria-label', selectButton.textContent + ' 선택');
+      checkbox.setAttribute('aria-label', selectButton.textContent + ' ' + ui('select','선택','select'));
       checkbox.addEventListener('change', () => {
         if (checkbox.checked) selectionSet.add(item.id);
         else selectionSet.delete(item.id);
@@ -746,9 +764,11 @@ export function mountEditor(container, options = {}) {
     updateInspectorDisclosure(show);
     inspector.replaceChildren();
     if (!show) return;
-    const heading = node('h2', '객체 속성', inspector);
+    const header = node('div', undefined, inspector);
+    header.className = 'wne-inspector-heading';
+    const heading = node('h2', '객체 속성', header);
     heading.tabIndex = -1;
-    button(inspector, '속성 닫기', closeInspector);
+    button(header, '속성 닫기', closeInspector);
     for (const [delta, label] of [[-1, '객체 위로'], [1, '객체 아래로']]) {
       button(inspector, label, () => change((entry) => {
         const from = entry.objects.findIndex(({ id }) => id === item.id);
@@ -756,22 +776,30 @@ export function mountEditor(container, options = {}) {
       })).disabled = !group().objects[group().objects.indexOf(item) + delta];
     }
 
+    function section(label) {
+      const fields = node('fieldset', undefined, inspector);
+      node('legend', label, fields);
+      return fields;
+    }
+
+    let fields;
     function update(key, value, choices, numeric = false, required = false) {
       let lastValue = value;
-      const control = field(inspector, keyLabels[key], value, (edited) => {
+      const control = field(fields, keyLabels[key], value, (edited) => {
         const success = change((entry) => {
           const target = entry.objects.find(({ id }) => id === item.id);
           if (key === 'kind') Object.assign(target, changeKind(target, edited));
           else target[key] = edited === '' && !required ? undefined : numeric ? Number(edited) : edited;
         }, { redraw: false });
         if (success) {
-          lastValue = object()[key] ?? edited;
+          lastValue = key === 'maxWidth' && edited === '' ? '' : object()[key] ?? edited;
           renderDocument();
           updateObjectCommands();
           updateInspectorDisclosure(true);
         }
         control.value = lastValue ?? '';
       }, { choices, inputMode: numeric ? 'decimal' : undefined });
+      return control;
     }
 
     button(inspector, '객체 삭제', () => {
@@ -790,6 +818,7 @@ export function mountEditor(container, options = {}) {
       src: '자산 URL', alt: '대체 텍스트', title: '미디어 제목', transcript: '대본', role: '소리 구분',
       videoId: 'YouTube 영상 ID', startS: '재생 시작 (초)', endS: '재생 종료 (초)', loop: '반복',
     };
+    fields = section(item.type === 'text' ? '본문 서식' : item.type === 'image' ? '이미지' : '미디어');
     if (item.type === 'text') {
       update('kind', item.kind, kinds);
       update('align', item.align ?? 'start', [['start', '시작'], ['center', '가운데'], ['end', '끝'], ['justify', '양쪽']]);
@@ -808,8 +837,13 @@ export function mountEditor(container, options = {}) {
       update('endS', item.endS, null, true);
       update('loop', item.loop, loops);
     }
+    fields = section('위치와 크기');
     for (const key of ['x', 'y', 'width', 'height']) update(key, item[key]);
-    for (const key of ['minWidth', 'maxWidth', 'showFrom', 'showTo', 'enterEnd', 'exitStart']) update(key, item[key], null, true);
+    update('minWidth', item.minWidth, null, true);
+    const maxWidth = item.maxWidth === Number.MAX_SAFE_INTEGER ? '' : item.maxWidth;
+    update('maxWidth', maxWidth, null, true).placeholder = '제한 없음';
+    fields = section('표시 구간과 효과');
+    for (const key of ['showFrom', 'showTo', 'enterEnd', 'exitStart']) update(key, item[key], null, true);
     for (const effect of ['enter', 'hold', 'exit']) update(effect, item[effect], viewEffects);
   }
 
@@ -864,7 +898,7 @@ export function mountEditor(container, options = {}) {
 
   function togglePreview() {
     previewHost.hidden = !previewHost.hidden;
-    previewButton.textContent = previewHost.hidden ? '미리보기 열기' : '미리보기 닫기';
+    commands.apply(previewButton, previewHost.hidden ? '미리보기 열기' : '미리보기 닫기');
     previewButton.setAttribute('aria-expanded', String(!previewHost.hidden));
     if (previewHost.hidden) {
       preview?.destroy();
@@ -883,7 +917,7 @@ export function mountEditor(container, options = {}) {
         const { mountViewer } = await import('../viewer/viewer.js');
         if (previewHost.hidden || controller.signal.aborted) return;
         preview?.destroy();
-        const next = mountViewer(previewHost, work, { assetBaseUrl: baseUrl });
+        const next = mountViewer(previewHost, work, { assetBaseUrl: baseUrl, locale, messages: options.messages });
         preview = next;
         await next.ready;
         if (preview === next) next.seek(groupId);

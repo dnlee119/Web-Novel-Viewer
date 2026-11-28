@@ -1,0 +1,16 @@
+/* Local defaults shared by the demo, embedded editor and shadow-root viewer. */
+.wn-demo, .wne, .wnv {
+  --wn-ink: #18344a;
+  --wn-muted: #486477;
+  --wn-sky: #e7f5ff;
+  --wn-edge: #b3ccdc;
+  --wn-blue: #14648c;
+  --wn-focus: #006593;
+  --wn-paper-grain: repeating-linear-gradient(7deg, transparent 0 4px, rgb(59 95 121 / 3%) 4px 5px),
+    repeating-linear-gradient(92deg, transparent 0 7px, rgb(59 95 121 / 2%) 7px 8px);
+  --wn-metal-grain: repeating-linear-gradient(0deg, transparent 0 2px, rgb(64 100 124 / 5%) 2px 3px),
+    linear-gradient(115deg, rgb(255 255 255 / 88%), transparent 40%, rgb(150 186 209 / 24%) 72%, rgb(255 255 255 / 65%));
+}
+@media (forced-colors: active), print {
+  .wn-demo, .wne, .wnv { --wn-paper-grain: none; --wn-metal-grain: none; }
+}

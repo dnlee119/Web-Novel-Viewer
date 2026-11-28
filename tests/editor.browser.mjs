@@ -106,6 +106,36 @@ for (const browserType of [chromium, firefox]) {
     await page.getByRole('link', { name: '작품 편집기 열기' }).click();
     await page.locator('[data-object="platform-opening"]').waitFor();
 
+    // UI messages belong to the instance, including state changes and editor previews.
+    await page.evaluate(async () => {
+      const { mountEditor } = await import('/site/editor/editor.js');
+      const { mountViewer } = await import('/site/viewer/viewer.js');
+      const options = { locale: 'fr-CA', messages: {
+        viewer: { play: 'Lire', pause: 'En pause' }, editor: { undo: 'Annuler' },
+      } };
+      const work = { schemaVersion: 1, lang: 'ko', title: '원고',
+        groups: [{ id: 'one', title: '실행 취소', objects: [] }] };
+      const holder = document.createElement('div');
+      document.body.append(holder);
+      const editorHost = holder.appendChild(document.createElement('div'));
+      const viewerHost = holder.appendChild(document.createElement('div'));
+      const editor = mountEditor(editorHost, { ...options, source: work });
+      const viewer = mountViewer(viewerHost, work, options);
+      await Promise.all([editor.ready, viewer.ready]);
+      window.removeLanguageTest = () => { editor.destroy(); viewer.destroy(); holder.remove(); };
+    });
+    const translated = page.getByRole('button', { name: 'Annuler', exact: true });
+    assert.equal(await translated.getAttribute('title'), 'Annuler');
+    assert.equal(await translated.locator('svg[aria-hidden="true"]').count(), 1);
+    assert.equal(await page.locator('[data-scene="one"]').textContent(), '실행 취소');
+    await page.getByRole('button', { name: 'Lire', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: 'En pause' }).getAttribute('title'), 'En pause');
+    await page.getByRole('button', { name: 'En pause' }).click();
+    await page.getByRole('button', { name: 'Open preview' }).click();
+    await page.getByRole('button', { name: 'Close preview' }).waitFor();
+    await page.locator('.wne-preview-host').getByRole('button', { name: 'Lire' }).waitFor();
+    await page.evaluate(() => window.removeLanguageTest());
+
     // Mount the modules into an ordinary host page and use its cross-origin API.
     await page.evaluate(async (apiOrigin) => {
       const { mountEditor } = await import('/site/editor/editor.js');

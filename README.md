@@ -56,3 +56,21 @@ GET은 작품 JSON을 반환하고 POST는 그 형식으로 된 본문을 받습
 
 - 작업 제안과 진행 상황은 [GitHub Issues](https://github.com/dnlee119/Web-Novel-Viewer/issues)에서 관리합니다. 변경은 작업별 브랜치에서 진행하고 `main`으로 Pull Request를 엽니다.
 - `site/index.html`이 준비되면 `main`의 `site/` 변경을 GitHub Pages에 자동 배포합니다. 실행 결과는 [GitHub Actions](https://github.com/dnlee119/Web-Novel-Viewer/actions)에서 확인할 수 있습니다.
+
+### 버튼 언어와 설명
+
+뷰어와 에디터를 장착할 때 `locale`로 버튼 언어를 고를 수 있습니다. 한국어와 영어를 제공하며, 다른 언어는 `messages.viewer`와 `messages.editor`에 필요한 문구를 지정합니다. 지정하지 않은 키는 기본 번역을 사용합니다. 아이콘의 마우스 설명과 화면 읽기 이름에 같은 문구가 적용됩니다. 터치 환경에서는 버튼에 설명이 함께 표시됩니다.
+
+```js
+const ui = {
+  locale: 'fr',
+  messages: {
+    viewer: { play: 'Lecture automatique', pause: 'Pause' },
+    editor: { openFile: 'Ouvrir un fichier', undo: 'Annuler', redo: 'Rétablir' },
+  },
+};
+mountViewer(readerContainer, source, ui);
+mountEditor(editorContainer, { ...ui, source });
+```
+
+뷰어 문구 키는 `site/viewer/viewer.js`의 `labels`, 편집 명령 키는 `site/editor/actions.js`의 `actions`에서 확인할 수 있습니다. 작품 제목과 본문은 원문의 언어를 유지합니다.
