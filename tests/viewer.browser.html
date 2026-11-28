@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+  <meta charset="utf-8">
+  <title>Viewer browser tests</title>
+  <div id="first"></div>
+  <div id="second"></div>
+  <pre id="result" aria-live="polite">Running</pre>
+  <script type="module">
+    import { mountViewer } from '../site/viewer/viewer.js';
+    import { parseWork } from '../site/viewer/source.js';
+
+    const first = document.getElementById('first');
+    const second = document.getElementById('second');
+    const result = document.getElementById('result');
+    const jsonUrl = new URL('../site/stories/first-train.json', location.href);
+    const htmlUrl = new URL('../site/stories/first-train.wn.html', location.href);
+    const parse = (value) => parseWork(value, { baseUrl: jsonUrl });
+    const tick = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const require = (condition, message) => {
+      if (!condition) throw new Error(message);
+    };
+    const shadow = (container) => container.querySelector('.wnv-host').shadowRoot;
+
+    function requireInvalid(markup, message) {
+      let error;
+      try {
+        parse(markup);
+      } catch (caught) {
+        error = caught;
+      }
+      require(error?.message.includes(message), `expected ${message}, got ${error}`);
+    }
+
+    try {
+      const responses = await Promise.all([fetch(jsonUrl), fetch(htmlUrl)]);
+      const [json, html] = await Promise.all(responses.map((response) => response.text()));
+      require(JSON.stringify(parse(json)) === JSON.stringify(parse(html)), 'HTML and JSON differ');
+      requireInvalid(html.replace('wn-image', 'wn-unknown'), 'unsupported object');
+      requireInvalid(html.replace('id="platform-image"', 'id="platform"'), 'duplicate ID');
+      requireInvalid(html.replace('show-from="0.18"', 'show-from="2"'), 'showFrom');
+      requireInvalid(html.replace('<strong>', '<strong onclick="void(0)">'), 'unadorned');
+
+      const data = JSON.parse(json);
+      data.groups.splice(1, 0, {
+        id: 'skipped',
+        objects: [{ id: 'skip-text', type: 'text', content: ['이 장면은 건너뜁니다.'] }],
+      });
+      const a = mountViewer(first, data, { assetBaseUrl: jsonUrl });
+      const b = mountViewer(second, { getUrl: htmlUrl.href });
+      await Promise.all([a.ready, b.ready]);
+      const stageA = shadow(first);
+      const stageB = shadow(second);
+      while (!stageA.querySelector('.wnv-scene').dataset.groupId) await tick();
+      const viewport = stageA.querySelector('.wnv-viewport');
+      const scene = stageA.querySelector('.wnv-scene');
+      const snapshot = () => JSON.stringify([scene.dataset.groupId, ...[...scene.children].map(
+        (node) => [node.dataset.objectId, node.hidden, node.style.opacity, node.style.transform],
+      )]);
+
+      viewport.scrollTop = Math.round(viewport.clientHeight * 1.2) +
+        viewport.clientHeight + Math.round(viewport.clientHeight * 0.98 * 0.25);
+      await tick();
+      const forward = snapshot();
+      const destination = viewport.scrollTop;
+      viewport.scrollTop = viewport.scrollHeight;
+      await tick();
+      viewport.scrollTop = destination;
+      await tick();
+      require(snapshot() === forward, 'reverse scroll yielded a different scene state');
+      viewport.scrollTop = 0;
+      await tick();
+      let renderedSkipped = false;
+      const changes = new MutationObserver((records) => {
+        renderedSkipped ||= records.some((record) =>
+          [...record.addedNodes].some((node) => node.dataset?.objectId === 'skip-text'));
+      });
+      changes.observe(scene, { childList: true });
+      viewport.scrollTop = destination;
+      await tick();
+      changes.disconnect();
+      require(snapshot() === forward && !renderedSkipped, 'fast jump rendered a skipped group');
+      require(stageB.querySelector('.wnv-scene').dataset.groupId === 'platform', 'instances share state');
+
+      a.seek('platform', 0.18);
+      await tick();
+      stageA.querySelectorAll('.wnv-control')[1].click();
+      await tick();
+      require(scene.querySelector('[data-object-id="platform-opening"]').style.opacity === '1', 'motion toggle failed');
+      const original = stageA.querySelector('.wnv-original');
+      stageA.querySelector('.wnv-control').click();
+      require(!original.hidden && original.textContent.includes('열린 문'), 'original view is incomplete');
+      stageA.querySelector('.wnv-control').click();
+      await tick();
+      require(scene.dataset.groupId === 'platform', 'original toggle lost the active group');
+
+      a.seek('platform');
+      require(a.play(), 'automatic playback did not start');
+      await tick();
+      require(viewport.scrollTop > 0, 'automatic playback did not move the viewport');
+      viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: 1 }));
+      const pausedOffset = viewport.scrollTop;
+      await tick();
+      require(!a.pause() && viewport.scrollTop === pausedOffset, 'manual scrolling did not pause playback');
+
+      const invalid = mountViewer(first, html.replace('schema-version="1"', 'schema-version="9"'));
+      await invalid.ready.then(() => { throw new Error('invalid mount unexpectedly succeeded'); }, () => {});
+      require(!!first.querySelector('[role="alert"]') && shadow(first) === stageA, 'error removed the active viewer');
+      invalid.destroy();
+      a.destroy();
+      require(!first.children.length && !!second.querySelector('.wnv-host'), 'destroy affected another viewer');
+      b.destroy();
+      result.dataset.status = 'passed';
+      result.textContent = 'Passed';
+    } catch (error) {
+      result.dataset.status = 'failed';
+      result.textContent = error.stack;
+    }
+  </script>
+</html>

@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "title": "첫차가 오는 시간",
+  "lang": "ko",
+  "groups": [
+    {
+      "id": "platform",
+      "title": "빈 승강장",
+      "scrollVh": 120,
+      "autoMs": 8000,
+      "objects": [
+        {
+          "id": "platform-image",
+          "type": "image",
+          "src": "./images/dawn-platform.webp",
+          "alt": "새벽빛이 비치는 빈 승강장과 문이 열린 첫차",
+          "x": 0,
+          "y": 0,
+          "width": "55%",
+          "height": "100%"
+        },
+        {
+          "id": "platform-opening",
+          "type": "text",
+          "x": "61%",
+          "y": "19%",
+          "width": "33%",
+          "fontSize": "1.85rem",
+          "content": ["새벽의 승강장은 아직 아무에게도 이름을 불리지 않은 것처럼 ", {"tag": "strong", "children": ["조용했다."]}]
+        },
+        {
+          "id": "platform-detail",
+          "type": "text",
+          "x": "61%",
+          "y": "58%",
+          "width": "33%",
+          "showFrom": 0.18,
+          "enter": "fade",
+          "content": ["그는 첫차가 들어서기 전까지 늘 같은 자리에 서 있었다. 어둠 속에서 레일이 먼저 빛나는 것을 좋아했다."]
+        },
+        {
+          "id": "platform-chime",
+          "type": "audio",
+          "role": "music",
+          "title": "승강장의 종소리",
+          "src": "./media/platform-chime.wav",
+          "x": "61%",
+          "y": "82%",
+          "width": "33%"
+        }
+      ]
+    },
+    {
+      "id": "door",
+      "title": "열린 문",
+      "scrollVh": 98,
+      "autoMs": 6500,
+      "objects": [
+        {
+          "id": "door-opening",
+          "type": "text",
+          "kind": "sentence",
+          "x": "7%",
+          "y": "24%",
+          "width": "37%",
+          "fontSize": "2rem",
+          "content": ["첫차는 소리보다 ", {"tag": "em", "children": ["빛을"]}, " 먼저 데려왔다."]
+        },
+        {
+          "id": "door-detail",
+          "type": "text",
+          "x": "7%",
+          "y": "62%",
+          "width": "37%",
+          "showFrom": 0.15,
+          "enter": "slide",
+          "content": ["문이 열렸다. 그는 한 박자 늦게 발을 옮겼다. 그제야 어제와 다른 하루가 시작됐다."]
+        },
+        {
+          "id": "door-image",
+          "type": "image",
+          "src": "./images/dawn-platform.webp",
+          "alt": "정차한 첫차 객실에서 승강장으로 새어 나오는 불빛",
+          "x": "51%",
+          "y": 0,
+          "width": "49%",
+          "height": "100%"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+:root {
+  color-scheme: light;
+  font-family: "Noto Sans KR", "Noto Sans CJK KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  color: #1d2b35;
+  background: #f8f7f4;
+}
+
+body { margin: 0; }
+.masthead { background: #fff; border-bottom: 1px solid #e2e0da; }
+.masthead-inner {
+  max-width: 74rem;
+  min-height: 4rem;
+  margin: auto;
+  padding: 0 clamp(1rem, 3vw, 2rem);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem 1rem;
+}
+.brand { display: inline-flex; align-items: center; gap: .7rem; font-weight: 700; }
+.brand-mark {
+  display: inline-block;
+  width: .95rem;
+  height: 1.05rem;
+  border: solid #974d32;
+  border-width: 2px 2px 2px 5px;
+  border-radius: .12rem;
+}
+.masthead-detail { color: #55616a; font-size: .875rem; }
+.reading-room {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: clamp(1.75rem, 5vw, 4.15rem) clamp(1rem, 4vw, 2rem) 1.5rem;
+}
+.story-heading { margin-bottom: clamp(1.25rem, 3vw, 2rem); }
+.story-heading h1 {
+  margin: 0 0 .55rem;
+  font-size: clamp(2rem, 5vw, 3.75rem);
+  font-weight: 750;
+  letter-spacing: -.045em;
+  line-height: 1.16;
+}
+.story-heading p {
+  margin: 0;
+  max-width: 42rem;
+  color: #52616b;
+  line-height: 1.65;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.reader {
+  --wnv-stage-background: #f5f2e9;
+  --wnv-accent: #974d32;
+  border: 1px solid #deded7;
+  border-radius: .85rem;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 10px 30px #2434400a;
+}
+.fallback, .wnv-status { padding: 0 1rem; }
+.fallback h2 { margin-top: 1.25rem; font-size: 1.1rem; }
+.fallback p { line-height: 1.7; }
+.credit { margin: .85rem 0 0; color: #58646c; font-size: .875rem; line-height: 1.5; }
